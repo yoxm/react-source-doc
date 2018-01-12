@@ -404,5 +404,37 @@ function renderSubtreeIntoContainer(parentComponent, children, container, forceH
 }
 ```
 
-这其中传入的参数**`hydrate` **描述的是 ReactDOM 复用 ReactDOMServer 服务端渲染的内容时尽可能保留结构，并补充事件绑定等 Client 特有内容的过程。其中，经过一系列的判断
+这其中传入的参数`hydrate`** **描述的是 ReactDOM 复用 ReactDOMServer 服务端渲染的内容时尽可能保留结构，并补充事件绑定等 Client 特有内容的过程。container是挂载的节点如div\#root，其中，经过一系列的判断，我们的newRoot节点是调用此文件下的createContainer\(container, shouldHydrate\),此文件代码如下
+
+```
+createContainer: function (containerInfo, hydrate) {
+  return createFiberRoot(containerInfo, hydrate);
+},
+```
+
+可以看到进入了react的fiberRoot方法中，createFiberRoot代码如下：
+
+```
+function createFiberRoot(containerInfo, hydrate) {
+  // Cyclic construction. This cheats the type system right now because
+  // stateNode is any.
+  var uninitializedFiber = createHostRootFiber();
+  var root = {
+    current: uninitializedFiber,
+    containerInfo: containerInfo,
+    pendingChildren: null,
+    remainingExpirationTime: NoWork,
+    isReadyForCommit: false,
+    finishedWork: null,
+    context: null,
+    pendingContext: null,
+    hydrate: hydrate,
+    nextScheduledRoot: null
+  };
+  uninitializedFiber.stateNode = root;
+  return root;
+}
+```
+
+这是React 16的FiberRoot的结构，createHostRootFiber\(\)
 
