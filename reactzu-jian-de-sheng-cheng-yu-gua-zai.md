@@ -33,100 +33,42 @@ console.log\(\);打印一下看看！
 
 但是，我们的JSX语法，也就是&lt;App /&gt;这种形式的的对象是怎么构成的呢？
 
-在react的github上，packages/events/react/src/React.js文件如下
+在node\_module/react/umd/react.development.js中相关代码如下
 
 ```
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-import assign from 'object-assign';
-import ReactVersion from 'shared/ReactVersion';
-import {REACT_FRAGMENT_TYPE} from 'shared/ReactSymbols';
-
-import {Component, PureComponent, AsyncComponent} from './ReactBaseClasses';
-import {forEach, map, count, toArray, only} from './ReactChildren';
-import ReactCurrentOwner from './ReactCurrentOwner';
-import {
-  createElement,
-  createFactory,
-  cloneElement,
-  isValidElement,
-} from './ReactElement';
-import {
-  createElementWithValidation,
-  createFactoryWithValidation,
-  cloneElementWithValidation,
-} from './ReactElementValidator';
-import ReactDebugCurrentFrame from './ReactDebugCurrentFrame';
-
 var React = {
   Children: {
-    map,
-    forEach,
-    count,
-    toArray,
-    only,
+    map: mapChildren,
+    forEach: forEachChildren,
+    count: countChildren,
+    toArray: toArray,
+    only: onlyChild
   },
 
-  Component,
-  PureComponent,
+  Component: Component,
+  PureComponent: PureComponent,
   unstable_AsyncComponent: AsyncComponent,
 
   Fragment: REACT_FRAGMENT_TYPE,
 
-  createElement: __DEV__ ? createElementWithValidation : createElement,
-  cloneElement: __DEV__ ? cloneElementWithValidation : cloneElement,
-  createFactory: __DEV__ ? createFactoryWithValidation : createFactory,
+  createElement: createElementWithValidation,
+  cloneElement: cloneElementWithValidation,
+  createFactory: createFactoryWithValidation,
   isValidElement: isValidElement,
 
   version: ReactVersion,
 
   __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    ReactCurrentOwner,
+    ReactCurrentOwner: ReactCurrentOwner,
     // Used by renderers to avoid bundling object-assign twice in UMD bundles:
-    assign,
-  },
+    assign: objectAssign
+  }
 };
-
-if (__DEV__) {
-  Object.assign(React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED, {
-    // These should not be included in production.
-    ReactDebugCurrentFrame,
-    // Shim for React DOM 16.0.0 which still destructured (but not used) this.
-    // TODO: remove in React 17.0.
-    ReactComponentTreeHook: {},
-  });
-}
-
-export default React;
 ```
 
 发现React对外暴露的React对象拥有Children， Component， PureComponent， unstable\_AsyncComponent，Fragment，createElement，cloneElement，createFactory，isValidElement及\_\_SECRET\_INTERNALS\_DO\_NOT\_USE\_OR\_YOU\_WILL\_BE\_FIRED这几个方法，其中的Component就是我们最常使用的方法，PureComponent是傀儡（受控\)组件的实现，顺着上面import的ReactBaseClasses来看看这个文件里有什么。
 
 ```
-import emptyObject from 'fbjs/lib/emptyObject';
-import invariant from 'fbjs/lib/invariant';
-import lowPriorityWarning from 'shared/lowPriorityWarning';
-
-import ReactNoopUpdateQueue from './ReactNoopUpdateQueue';
-
-
-function Component(props, context, updater) {
-  this.props = props;
-  this.context = context;
-  this.refs = emptyObject;
-  // We initialize the default updater but the real one gets injected by the
-  // renderer.
-  this.updater = updater || ReactNoopUpdateQueue;
-}
-
-Component.prototype.isReactComponent = {};
-
-
 Component.prototype.setState = function(partialState, callback) {
   invariant(
     typeof partialState === 'object' ||
@@ -142,39 +84,6 @@ Component.prototype.setState = function(partialState, callback) {
 Component.prototype.forceUpdate = function(callback) {
   this.updater.enqueueForceUpdate(this, callback, 'forceUpdate');
 };
-
-if (__DEV__) {
-  const deprecatedAPIs = {
-    isMounted: [
-      'isMounted',
-      'Instead, make sure to clean up subscriptions and pending requests in ' +
-        'componentWillUnmount to prevent memory leaks.',
-    ],
-    replaceState: [
-      'replaceState',
-      'Refactor your code to use setState instead (see ' +
-        'https://github.com/facebook/react/issues/3236).',
-    ],
-  };
-  const defineDeprecationWarning = function(methodName, info) {
-    Object.defineProperty(Component.prototype, methodName, {
-      get: function() {
-        lowPriorityWarning(
-          false,
-          '%s(...) is deprecated in plain JavaScript React classes. %s',
-          info[0],
-          info[1],
-        );
-        return undefined;
-      },
-    });
-  };
-  for (const fnName in deprecatedAPIs) {
-    if (deprecatedAPIs.hasOwnProperty(fnName)) {
-      defineDeprecationWarning(fnName, deprecatedAPIs[fnName]);
-    }
-  }
-}
 
 
 function PureComponent(props, context, updater) {
@@ -219,7 +128,7 @@ export {Component, PureComponent, AsyncComponent};
 
 为方便观看起见，删除了部分注释，我们可以看到Component就是一个构造函数，内部的props，refs，context，updater属性，以及setState，forceUpdate，并且，我们应该注意到的是，setState是接受两个参数的，第一个是整个应用部分的state，第二个是回调函数。其他的PureComponent，asynComponent同理。这样，我们的&lt;App /&gt;就有了最开始的样子。
 
-## 二、React组件是怎么挂载的
+## 二、React组件是怎么初始化的
 
 生成了React组件后，便可以在其内部自定义方法，并且使用React自带的生命周期函数，但是他是怎么挂载到真实的DOM树上的呢？
 
@@ -252,178 +161,134 @@ var App = function (_Component) {
 exports.default = App;
 ```
 
-其中的inherits是es6 extends的实现，表示继承，我们可以关注下createClass 和 createElement,我们可以打开与React.js同级目录下的ReactElement.js看一下。
+其中的inherits是es6 extends的实现，表示继承，我们可以关注下createClass 和 createElement,我们可以打开与React.js同级目录下看一下。
 
-    /**
-     * Factory method to create a new React element. This no longer adheres to
-     * the class pattern, so do not use new to call it. Also, no instanceof check
-     * will work. Instead test $$typeof field against Symbol.for('react.element') to check
-     * if something is a React Element.
-     *
-     * @param {*} type
-     * @param {*} key
-     * @param {string|object} ref
-     * @param {*} self A *temporary* helper to detect places where `this` is
-     * different from the `owner` when React.createElement is called, so that we
-     * can warn. We want to get rid of owner and replace string `ref`s with arrow
-     * functions, and as long as `this` and owner are the same, there will be no
-     * change in behavior.
-     * @param {*} source An annotation object (added by a transpiler or otherwise)
-     * indicating filename, line number, and/or other information.
-     * @param {*} owner
-     * @param {*} props
-     * @internal
-     */
-    const ReactElement = function(type, key, ref, self, source, owner, props) {
-      const element = {
-        // This tag allow us to uniquely identify this as a React Element
-        $$typeof: REACT_ELEMENT_TYPE,
+```
+    function createElement(type, config, children) {
+        var propName;
 
-        // Built-in properties that belong on the element
-        type: type,
-        key: key,
-        ref: ref,
-        props: props,
+        // Reserved names are extracted
+        var props = {};
 
-        // Record the component responsible for creating this element.
-        _owner: owner,
-      };
+        var key = null;
+        var ref = null;
+        var self = null;
+        var source = null;
 
-      if (__DEV__) {
-        // The validation flag is currently mutative. We put it on
-        // an external backing store so that we can freeze the whole object.
-        // This can be replaced with a WeakMap once they are implemented in
-        // commonly used development environments.
-        element._store = {};
-
-        // To make comparing ReactElements easier for testing purposes, we make
-        // the validation flag non-enumerable (where possible, which should
-        // include every environment we run tests in), so the test framework
-        // ignores it.
-        Object.defineProperty(element._store, 'validated', {
-          configurable: false,
-          enumerable: false,
-          writable: true,
-          value: false,
-        });
-        // self and source are DEV only properties.
-        Object.defineProperty(element, '_self', {
-          configurable: false,
-          enumerable: false,
-          writable: false,
-          value: self,
-        });
-        // Two elements created in two different places should be considered
-        // equal for testing purposes and therefore we hide it from enumeration.
-        Object.defineProperty(element, '_source', {
-          configurable: false,
-          enumerable: false,
-          writable: false,
-          value: source,
-        });
-        if (Object.freeze) {
-          Object.freeze(element.props);
-          Object.freeze(element);
-        }
-      }
-
-      return element;
-    };
-
-    /**
-     * Create and return a new ReactElement of the given type.
-     * See https://reactjs.org/docs/react-api.html#createelement
-     */
-    export function createElement(type, config, children) {
-      let propName;
-
-      // Reserved names are extracted
-      const props = {};
-
-      let key = null;
-      let ref = null;
-      let self = null;
-      let source = null;
-
-      if (config != null) {
-        if (hasValidRef(config)) {
-          ref = config.ref;
-        }
-        if (hasValidKey(config)) {
-          key = '' + config.key;
-        }
-
-        self = config.__self === undefined ? null : config.__self;
-        source = config.__source === undefined ? null : config.__source;
-        // Remaining properties are added to a new props object
-        for (propName in config) {
-          if (
-            hasOwnProperty.call(config, propName) &&
-            !RESERVED_PROPS.hasOwnProperty(propName)
-          ) {
-            props[propName] = config[propName];
-          }
-        }
-      }
-
-      // Children can be more than one argument, and those are transferred onto
-      // the newly allocated props object.
-      const childrenLength = arguments.length - 2;
-      if (childrenLength === 1) {
-        props.children = children;
-      } else if (childrenLength > 1) {
-        const childArray = Array(childrenLength);
-        for (let i = 0; i < childrenLength; i++) {
-          childArray[i] = arguments[i + 2];
-        }
-        if (__DEV__) {
-          if (Object.freeze) {
-            Object.freeze(childArray);
-          }
-        }
-        props.children = childArray;
-      }
-
-      // Resolve default props
-      if (type && type.defaultProps) {
-        const defaultProps = type.defaultProps;
-        for (propName in defaultProps) {
-          if (props[propName] === undefined) {
-            props[propName] = defaultProps[propName];
-          }
-        }
-      }
-      if (__DEV__) {
-        if (key || ref) {
-          if (
-            typeof props.$$typeof === 'undefined' ||
-            props.$$typeof !== REACT_ELEMENT_TYPE
-          ) {
-            const displayName =
-              typeof type === 'function'
-                ? type.displayName || type.name || 'Unknown'
-                : type;
-            if (key) {
-              defineKeyPropWarningGetter(props, displayName);
+        if (config != null) {
+            if (hasValidRef(config)) {
+                ref = config.ref;
             }
-            if (ref) {
-              defineRefPropWarningGetter(props, displayName);
+            if (hasValidKey(config)) {
+                key = '' + config.key;
             }
-          }
+
+            self = config.__self === undefined ? null : config.__self;
+            source = config.__source === undefined ? null : config.__source;
+            // Remaining properties are added to a new props object
+            for (propName in config) {
+                if (hasOwnProperty$1.call(config, propName) && !RESERVED_PROPS.hasOwnProperty(propName)) {
+                    props[propName] = config[propName];
+                }
+            }
         }
-      }
-      return ReactElement(
-        type,
-        key,
-        ref,
-        self,
-        source,
-        ReactCurrentOwner.current,
-        props,
-      );
+
+        // Children can be more than one argument, and those are transferred onto
+        // the newly allocated props object.
+        var childrenLength = arguments.length - 2;
+        if (childrenLength === 1) {
+            props.children = children;
+        } else if (childrenLength > 1) {
+            var childArray = Array(childrenLength);
+            for (var i = 0; i < childrenLength; i++) {
+                childArray[i] = arguments[i + 2];
+            }
+            {
+                if (Object.freeze) {
+                    Object.freeze(childArray);
+                }
+            }
+            props.children = childArray;
+        }
+
+        // Resolve default props
+        if (type && type.defaultProps) {
+            var defaultProps = type.defaultProps;
+            for (propName in defaultProps) {
+                if (props[propName] === undefined) {
+                    props[propName] = defaultProps[propName];
+                }
+            }
+        }
+        {
+            if (key || ref) {
+                if (typeof props.$$typeof === 'undefined' || props.$$typeof !== REACT_ELEMENT_TYPE) {
+                    var displayName = typeof type === 'function' ? type.displayName || type.name || 'Unknown' : type;
+                    if (key) {
+                        defineKeyPropWarningGetter(props, displayName);
+                    }
+                    if (ref) {
+                        defineRefPropWarningGetter(props, displayName);
+                    }
+                }
+            }
+        }
+        return ReactElement(type, key, ref, self, source, ReactCurrentOwner.current, props);
     }
+    
+    ...
+    function createElementWithValidation(type, props, children) {
+        var validType = typeof type === 'string' || typeof type === 'function' || typeof type === 'symbol' || typeof type === 'number';
+        // We warn in this case but don't throw. We expect the element creation to
+        // succeed and there will likely be errors in render.
+        if (!validType) {
+            var info = '';
+            if (type === undefined || typeof type === 'object' && type !== null && Object.keys(type).length === 0) {
+                info += ' You likely forgot to export your component from the file ' + "it's defined in, or you might have mixed up default and named imports.";
+            }
 
-这是ReactElement的实现代码，可以看到，createElement的函数签名有3个参数，分别是type,config,children，返回了一个用ReactELement构造函数初始化后的组件。
+            var sourceInfo = getSourceInfoErrorAddendum(props);
+            if (sourceInfo) {
+                info += sourceInfo;
+            } else {
+                info += getDeclarationErrorAddendum();
+            }
+
+            info += getStackAddendum() || '';
+
+            warning_1(false, 'React.createElement: type is invalid -- expected a string (for ' + 'built-in components) or a class/function (for composite ' + 'components) but got: %s.%s', type == null ? type : typeof type, info);
+        }
+
+        var element = createElement.apply(this, arguments);
+
+        // The result can be nullish if a mock or a custom function is used.
+        // TODO: Drop this when these are no longer allowed as the type argument.
+        if (element == null) {
+            return element;
+        }
+
+        // Skip key warning if the type isn't valid since our key validation logic
+        // doesn't expect a non-string/function type and can throw confusing errors.
+        // We don't want exception behavior to differ between dev and prod.
+        // (Rendering will throw with a helpful message and as soon as the type is
+        // fixed, the key warnings will appear.)
+        if (validType) {
+            for (var i = 2; i < arguments.length; i++) {
+                validateChildKeys(arguments[i], type);
+            }
+        }
+
+        if (typeof type === 'symbol' && type === REACT_FRAGMENT_TYPE) {
+            validateFragmentProps(element);
+        } else {
+            validatePropTypes(element);
+        }
+
+        return element;
+    }
+```
+
+这是ReactElement的实现代码，可以看到，createElement的函数签名有3个参数，分别是type,config,children，返回了一个用ReactELement构造函数初始化后的组件。其中还有对defaultProps的处理
 
 | 参数 | 功能 |
 | :---: | :---: |
@@ -441,11 +306,92 @@ exports.default = App;
 | ref | 对应真实DOM树的引用 |
 | \_ower | \_ower\_owner === ReactCurrentOwner.current\(ReactCurrentOwner.js\),值为创建当前组件的对象，默认值为null。\_owner === ReactCurrentOwner.current\(ReactCurrentOwner.js\),值为创建当前组件的对象，默认值为null。 |
 
+看完上述内容相信大家已经对React组件的实质有了一定的了解。通过执行`React.createElement`创建出的`ReactElement`
 
+类型的js对象，就是组件。进一步说，如果我们通过`class`关键字声明两个组件,那么他们在真正被挂载之前一直是`ReactElement`
 
+类型的js对象。
 
+## 三、组件是怎么挂载到DOM上的
 
+我们知道可以通过`ReactDOM.render(component,mountNode)`的形式对自定义组件/原生DOM/字符串进行挂载，例如
 
+```
+ReactDOM.render(<App />, document.getElementById('root'));
+```
+
+但是其中是怎么挂载到实际DOM树上的呢？我们可以打开packages/events/react/src/react-dom/src/client/ReactDOM.js看一下
+
+下面是相关代码:
+
+```
+function ReactRoot(container: Container, isAsync: boolean, hydrate: boolean) {
+  const root = DOMRenderer.createContainer(container, isAsync, hydrate);
+  this._internalRoot = root;
+}
+ReactRoot.prototype.render = function(
+  children: ReactNodeList,
+  callback: ?() => mixed,
+): Work {
+  const root = this._internalRoot;
+  const work = new ReactWork();
+  callback = callback === undefined ? null : callback;
+  if (__DEV__) {
+    warnOnInvalidCallback(callback, 'render');
+  }
+  if (callback !== null) {
+    work.then(callback);
+  }
+  DOMRenderer.updateContainer(children, root, null, work._onCommit);
+  return work;
+};
+...
+function renderSubtreeIntoContainer(
+  parentComponent: ?React$Component<any, any>,
+  children: ReactNodeList,
+  container: DOMContainer,
+  forceHydrate: boolean,
+  callback: ?Function,
+) {
+  invariant(
+    isValidContainer(container),
+    'Target container is not a DOM element.',
+  );
+
+    const isRootRenderedBySomeReact = !!container._reactRootContainer;
+    const rootEl = getReactRootElementInContainer(container);
+    const hasNonRootReactChild = !!(
+      rootEl && ReactDOMComponentTree.getInstanceFromNode(rootEl)
+    );
+
+  let root = container._reactRootContainer;
+  if (!root) {
+    const shouldHydrate =
+      forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
+    // First clear any existing content.
+    if (!shouldHydrate) {
+      let warned = false;
+      let rootSibling;
+      while ((rootSibling = container.lastChild)) {
+        
+        container.removeChild(rootSibling);
+      }
+    }
+   
+    const newRoot = DOMRenderer.createContainer(container, shouldHydrate);
+    root = container._reactRootContainer = newRoot;
+    // Initial mount should not be batched.
+    DOMRenderer.unbatchedUpdates(() => {
+      DOMRenderer.updateContainer(children, newRoot, parentComponent, callback);
+    });
+  } else {
+    DOMRenderer.updateContainer(children, root, parentComponent, callback);
+  }
+  return DOMRenderer.getPublicRootInstance(root);
+}
+```
+
+这
 
 
 
