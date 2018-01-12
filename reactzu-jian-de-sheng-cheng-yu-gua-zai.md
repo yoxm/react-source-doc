@@ -105,7 +105,5 @@ if (__DEV__) {
 export default React;
 ```
 
-
-
-
+我们可以发现，对外暴露的React组件拥有Children，Component，PureComponent，unstable\_AsyncComponent，createElement，cloneElement，createFactory，isValidElement，version
 
