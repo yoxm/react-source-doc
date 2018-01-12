@@ -108,7 +108,6 @@ export default React;
 发现React对外暴露的React对象拥有Children， Component， PureComponent， unstable\_AsyncComponent，Fragment，createElement，cloneElement，createFactory，isValidElement及\_\_SECRET\_INTERNALS\_DO\_NOT\_USE\_OR\_YOU\_WILL\_BE\_FIRED这几个方法，其中的Component就是我们最常使用的方法，PureComponent是傀儡（受控\)组件的实现，顺着上面import的ReactBaseClasses来看看这个文件里有什么。
 
 ```
-
 import emptyObject from 'fbjs/lib/emptyObject';
 import invariant from 'fbjs/lib/invariant';
 import lowPriorityWarning from 'shared/lowPriorityWarning';
@@ -216,7 +215,6 @@ asyncComponentPrototype.render = function() {
 };
 
 export {Component, PureComponent, AsyncComponent};
-
 ```
 
 为方便观看起见，删除了部分注释，我们可以看到Component就是一个构造函数，内部的props，refs，context，updater属性，以及setState，forceUpdate，并且，我们应该注意到的是，setState是接受两个参数的，第一个是整个应用部分的state，第二个是回调函数。其他的PureComponent，asynComponent同理。这样，我们的&lt;App /&gt;就有了最开始的样子。
@@ -225,5 +223,34 @@ export {Component, PureComponent, AsyncComponent};
 
 生成了React组件后，便可以在其内部自定义方法，并且使用React自带的生命周期函数，但是他是怎么挂载到真实的DOM树上的呢？
 
-我们可以吧&lt;App /&gt;组件
+我们可以吧&lt;App /&gt;组件的代码放到Babel中看一下。
+
+```
+var App = function (_Component) {
+  _inherits(App, _Component);
+
+  function App() {
+    _classCallCheck(this, App);
+
+    return _possibleConstructorReturn(this, (App.__proto__ || Object.getPrototypeOf(App)).apply(this, arguments));
+  }
+
+  _createClass(App, [{
+    key: 'render',
+    value: function render() {
+      return _react2.default.createElement(
+        'p',
+        null,
+        '\u6211\u662F\u4E00\u4E2AReact\u7EC4\u4EF6'
+      );
+    }
+  }]);
+
+  return App;
+}(_react.Component);
+
+exports.default = App;
+```
+
+
 
