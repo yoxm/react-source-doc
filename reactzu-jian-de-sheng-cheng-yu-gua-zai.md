@@ -235,7 +235,7 @@ exports.default = App;
         }
         return ReactElement(type, key, ref, self, source, ReactCurrentOwner.current, props);
     }
-    
+
     ...
     function createElementWithValidation(type, props, children) {
         var validType = typeof type === 'string' || typeof type === 'function' || typeof type === 'symbol' || typeof type === 'number';
@@ -288,7 +288,7 @@ exports.default = App;
     }
 ```
 
-这是ReactElement的实现代码，可以看到，createElement的函数签名有3个参数，分别是type,config,children，返回了一个用ReactELement构造函数初始化后的组件。其中还有对defaultProps的处理
+这是ReactElement的实现代码，可以看到，createElement的函数签名有3个参数，分别是type,config,children，返回了一个用ReactELement构造函数初始化后的组件。其中还有对defaultProps的处理，对于创建的element对象赋值了defaultProps。
 
 | 参数 | 功能 |
 | :---: | :---: |
@@ -320,68 +320,81 @@ exports.default = App;
 ReactDOM.render(<App />, document.getElementById('root'));
 ```
 
-但是其中是怎么挂载到实际DOM树上的呢？我们可以打开packages/events/react/src/react-dom/src/client/ReactDOM.js看一下
+但是其中是怎么挂载到实际DOM树上的呢？我们可以打开node\_modules/react-dom/umd/react-dom.development.js看一下
 
 下面是相关代码:
 
 ```
-function ReactRoot(container: Container, isAsync: boolean, hydrate: boolean) {
-  const root = DOMRenderer.createContainer(container, isAsync, hydrate);
-  this._internalRoot = root;
-}
-ReactRoot.prototype.render = function(
-  children: ReactNodeList,
-  callback: ?() => mixed,
-): Work {
-  const root = this._internalRoot;
-  const work = new ReactWork();
-  callback = callback === undefined ? null : callback;
-  if (__DEV__) {
-    warnOnInvalidCallback(callback, 'render');
-  }
-  if (callback !== null) {
-    work.then(callback);
-  }
-  DOMRenderer.updateContainer(children, root, null, work._onCommit);
-  return work;
-};
-...
-function renderSubtreeIntoContainer(
-  parentComponent: ?React$Component<any, any>,
-  children: ReactNodeList,
-  container: DOMContainer,
-  forceHydrate: boolean,
-  callback: ?Function,
-) {
-  invariant(
-    isValidContainer(container),
-    'Target container is not a DOM element.',
-  );
+/* 省略大量代码 */
+var ReactDOM = {
+  createPortal: createPortal,
 
-    const isRootRenderedBySomeReact = !!container._reactRootContainer;
-    const rootEl = getReactRootElementInContainer(container);
-    const hasNonRootReactChild = !!(
-      rootEl && ReactDOMComponentTree.getInstanceFromNode(rootEl)
-    );
+  findDOMNode: function (componentOrElement) {}
+  hydrate: function (element, container, callback) {
+    // TODO: throw or warn if we couldn't hydrate?
+    return renderSubtreeIntoContainer(null, element, container, true, callback);
+  },
+  render: function (element, container, callback) {
+    return renderSubtreeIntoContainer(null, element, container, false, callback);
+  },
+  unstable_renderSubtreeIntoContainer: function (parentComponent, element, containerNode, callback) {
+    !(parentComponent != null && has(parentComponent)) ? invariant_1(false, 'parentComponent must be a valid React Component') : void 0;
+    return renderSubtreeIntoContainer(parentComponent, element, containerNode, false, callback);
+  },
+   unmountComponentAtNode: function (container) {}
+ }
+```
 
-  let root = container._reactRootContainer;
+可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),下面是这个方法的源码
+
+```
+function renderSubtreeIntoContainer(parentComponent, children, container, forceHydrate, callback) {
+  !isValidContainer(container) ? invariant_1(false, 'Target container is not a DOM element.') : void 0;
+
+  {
+    if (container._reactRootContainer && container.nodeType !== COMMENT_NODE) {
+      var hostInstance = DOMRenderer.findHostInstanceWithNoPortals(container._reactRootContainer.current);
+      if (hostInstance) {
+        warning_1(hostInstance.parentNode === container, 'render(...): It looks like the React-rendered content of this ' + 'container was removed without using React. This is not ' + 'supported and will cause errors. Instead, call ' + 'ReactDOM.unmountComponentAtNode to empty a container.');
+      }
+    }
+
+    var isRootRenderedBySomeReact = !!container._reactRootContainer;
+    var rootEl = getReactRootElementInContainer(container);
+    var hasNonRootReactChild = !!(rootEl && getInstanceFromNode$1(rootEl));
+
+    warning_1(!hasNonRootReactChild || isRootRenderedBySomeReact, 'render(...): Replacing React-rendered children with a new root ' + 'component. If you intended to update the children of this node, ' + 'you should instead have the existing children update their state ' + 'and render the new components instead of calling ReactDOM.render.');
+
+    warning_1(container.nodeType !== ELEMENT_NODE || !container.tagName || container.tagName.toUpperCase() !== 'BODY', 'render(): Rendering components directly into document.body is ' + 'discouraged, since its children are often manipulated by third-party ' + 'scripts and browser extensions. This may lead to subtle ' + 'reconciliation issues. Try rendering into a container element created ' + 'for your app.');
+  }
+
+  var root = container._reactRootContainer;
   if (!root) {
-    const shouldHydrate =
-      forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
+    var shouldHydrate = forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
     // First clear any existing content.
     if (!shouldHydrate) {
-      let warned = false;
-      let rootSibling;
-      while ((rootSibling = container.lastChild)) {
-        
+      var warned = false;
+      var rootSibling = void 0;
+      while (rootSibling = container.lastChild) {
+        {
+          if (!warned && rootSibling.nodeType === ELEMENT_NODE && rootSibling.hasAttribute(ROOT_ATTRIBUTE_NAME)) {
+            warned = true;
+            warning_1(false, 'render(): Target node has markup rendered by React, but there ' + 'are unrelated nodes as well. This is most commonly caused by ' + 'white-space inserted around server-rendered markup.');
+          }
+        }
         container.removeChild(rootSibling);
       }
     }
-   
-    const newRoot = DOMRenderer.createContainer(container, shouldHydrate);
+    {
+      if (shouldHydrate && !forceHydrate && !warnedAboutHydrateAPI) {
+        warnedAboutHydrateAPI = true;
+        lowPriorityWarning$1(false, 'render(): Calling ReactDOM.render() to hydrate server-rendered markup ' + 'will stop working in React v17. Replace the ReactDOM.render() call ' + 'with ReactDOM.hydrate() if you want React to attach to the server HTML.');
+      }
+    }
+    var newRoot = DOMRenderer.createContainer(container, shouldHydrate);
     root = container._reactRootContainer = newRoot;
     // Initial mount should not be batched.
-    DOMRenderer.unbatchedUpdates(() => {
+    DOMRenderer.unbatchedUpdates(function () {
       DOMRenderer.updateContainer(children, newRoot, parentComponent, callback);
     });
   } else {
@@ -391,7 +404,5 @@ function renderSubtreeIntoContainer(
 }
 ```
 
-这
-
-
+这其中传入的参数**`hydrate` **描述的是 ReactDOM 复用 ReactDOMServer 服务端渲染的内容时尽可能保留结构，并补充事件绑定等 Client 特有内容的过程。其中，经过一系列的判断
 
