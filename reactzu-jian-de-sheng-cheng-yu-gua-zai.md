@@ -105,5 +105,125 @@ if (__DEV__) {
 export default React;
 ```
 
-我们可以发现，对外暴露的React组件拥有Children，Component，PureComponent，unstable\_AsyncComponent，createElement，cloneElement，createFactory，isValidElement，version
+发现React对外暴露的React对象拥有Children， Component， PureComponent， unstable\_AsyncComponent，Fragment，createElement，cloneElement，createFactory，isValidElement及\_\_SECRET\_INTERNALS\_DO\_NOT\_USE\_OR\_YOU\_WILL\_BE\_FIRED这几个方法，其中的Component就是我们最常使用的方法，PureComponent是傀儡（受控\)组件的实现，顺着上面import的ReactBaseClasses来看看这个文件里有什么。
+
+```
+
+import emptyObject from 'fbjs/lib/emptyObject';
+import invariant from 'fbjs/lib/invariant';
+import lowPriorityWarning from 'shared/lowPriorityWarning';
+
+import ReactNoopUpdateQueue from './ReactNoopUpdateQueue';
+
+
+function Component(props, context, updater) {
+  this.props = props;
+  this.context = context;
+  this.refs = emptyObject;
+  // We initialize the default updater but the real one gets injected by the
+  // renderer.
+  this.updater = updater || ReactNoopUpdateQueue;
+}
+
+Component.prototype.isReactComponent = {};
+
+
+Component.prototype.setState = function(partialState, callback) {
+  invariant(
+    typeof partialState === 'object' ||
+      typeof partialState === 'function' ||
+      partialState == null,
+    'setState(...): takes an object of state variables to update or a ' +
+      'function which returns an object of state variables.',
+  );
+  this.updater.enqueueSetState(this, partialState, callback, 'setState');
+};
+
+
+Component.prototype.forceUpdate = function(callback) {
+  this.updater.enqueueForceUpdate(this, callback, 'forceUpdate');
+};
+
+if (__DEV__) {
+  const deprecatedAPIs = {
+    isMounted: [
+      'isMounted',
+      'Instead, make sure to clean up subscriptions and pending requests in ' +
+        'componentWillUnmount to prevent memory leaks.',
+    ],
+    replaceState: [
+      'replaceState',
+      'Refactor your code to use setState instead (see ' +
+        'https://github.com/facebook/react/issues/3236).',
+    ],
+  };
+  const defineDeprecationWarning = function(methodName, info) {
+    Object.defineProperty(Component.prototype, methodName, {
+      get: function() {
+        lowPriorityWarning(
+          false,
+          '%s(...) is deprecated in plain JavaScript React classes. %s',
+          info[0],
+          info[1],
+        );
+        return undefined;
+      },
+    });
+  };
+  for (const fnName in deprecatedAPIs) {
+    if (deprecatedAPIs.hasOwnProperty(fnName)) {
+      defineDeprecationWarning(fnName, deprecatedAPIs[fnName]);
+    }
+  }
+}
+
+
+function PureComponent(props, context, updater) {
+  // Duplicated from Component.
+  this.props = props;
+  this.context = context;
+  this.refs = emptyObject;
+  // We initialize the default updater but the real one gets injected by the
+  // renderer.
+  this.updater = updater || ReactNoopUpdateQueue;
+}
+
+function ComponentDummy() {}
+ComponentDummy.prototype = Component.prototype;
+const pureComponentPrototype = (PureComponent.prototype = new ComponentDummy());
+pureComponentPrototype.constructor = PureComponent;
+// Avoid an extra prototype jump for these methods.
+Object.assign(pureComponentPrototype, Component.prototype);
+pureComponentPrototype.isPureReactComponent = true;
+
+function AsyncComponent(props, context, updater) {
+  // Duplicated from Component.
+  this.props = props;
+  this.context = context;
+  this.refs = emptyObject;
+  // We initialize the default updater but the real one gets injected by the
+  // renderer.
+  this.updater = updater || ReactNoopUpdateQueue;
+}
+
+const asyncComponentPrototype = (AsyncComponent.prototype = new ComponentDummy());
+asyncComponentPrototype.constructor = AsyncComponent;
+
+Object.assign(asyncComponentPrototype, Component.prototype);
+asyncComponentPrototype.unstable_isAsyncReactComponent = true;
+asyncComponentPrototype.render = function() {
+  return this.props.children;
+};
+
+export {Component, PureComponent, AsyncComponent};
+
+```
+
+为方便观看起见，删除了部分注释，我们可以看到Component就是一个构造函数，内部的props，refs，context，updater属性，以及setState，forceUpdate，并且，我们应该注意到的是，setState是接受两个参数的，第一个是整个应用部分的state，第二个是回调函数。其他的PureComponent，asynComponent同理。这样，我们的&lt;App /&gt;就有了最开始的样子。
+
+## 二、React组件是怎么挂载的
+
+生成了React组件后，便可以在其内部自定义方法，并且使用React自带的生命周期函数，但是他是怎么挂载到真实的DOM树上的呢？
+
+我们可以吧&lt;App /&gt;组件
 
