@@ -252,5 +252,200 @@ var App = function (_Component) {
 exports.default = App;
 ```
 
+其中的inherits是es6 extends的实现，表示继承，我们可以关注下createClass 和 createElement,我们可以打开与React.js同级目录下的ReactElement.js看一下。
+
+    /**
+     * Factory method to create a new React element. This no longer adheres to
+     * the class pattern, so do not use new to call it. Also, no instanceof check
+     * will work. Instead test $$typeof field against Symbol.for('react.element') to check
+     * if something is a React Element.
+     *
+     * @param {*} type
+     * @param {*} key
+     * @param {string|object} ref
+     * @param {*} self A *temporary* helper to detect places where `this` is
+     * different from the `owner` when React.createElement is called, so that we
+     * can warn. We want to get rid of owner and replace string `ref`s with arrow
+     * functions, and as long as `this` and owner are the same, there will be no
+     * change in behavior.
+     * @param {*} source An annotation object (added by a transpiler or otherwise)
+     * indicating filename, line number, and/or other information.
+     * @param {*} owner
+     * @param {*} props
+     * @internal
+     */
+    const ReactElement = function(type, key, ref, self, source, owner, props) {
+      const element = {
+        // This tag allow us to uniquely identify this as a React Element
+        $$typeof: REACT_ELEMENT_TYPE,
+
+        // Built-in properties that belong on the element
+        type: type,
+        key: key,
+        ref: ref,
+        props: props,
+
+        // Record the component responsible for creating this element.
+        _owner: owner,
+      };
+
+      if (__DEV__) {
+        // The validation flag is currently mutative. We put it on
+        // an external backing store so that we can freeze the whole object.
+        // This can be replaced with a WeakMap once they are implemented in
+        // commonly used development environments.
+        element._store = {};
+
+        // To make comparing ReactElements easier for testing purposes, we make
+        // the validation flag non-enumerable (where possible, which should
+        // include every environment we run tests in), so the test framework
+        // ignores it.
+        Object.defineProperty(element._store, 'validated', {
+          configurable: false,
+          enumerable: false,
+          writable: true,
+          value: false,
+        });
+        // self and source are DEV only properties.
+        Object.defineProperty(element, '_self', {
+          configurable: false,
+          enumerable: false,
+          writable: false,
+          value: self,
+        });
+        // Two elements created in two different places should be considered
+        // equal for testing purposes and therefore we hide it from enumeration.
+        Object.defineProperty(element, '_source', {
+          configurable: false,
+          enumerable: false,
+          writable: false,
+          value: source,
+        });
+        if (Object.freeze) {
+          Object.freeze(element.props);
+          Object.freeze(element);
+        }
+      }
+
+      return element;
+    };
+
+    /**
+     * Create and return a new ReactElement of the given type.
+     * See https://reactjs.org/docs/react-api.html#createelement
+     */
+    export function createElement(type, config, children) {
+      let propName;
+
+      // Reserved names are extracted
+      const props = {};
+
+      let key = null;
+      let ref = null;
+      let self = null;
+      let source = null;
+
+      if (config != null) {
+        if (hasValidRef(config)) {
+          ref = config.ref;
+        }
+        if (hasValidKey(config)) {
+          key = '' + config.key;
+        }
+
+        self = config.__self === undefined ? null : config.__self;
+        source = config.__source === undefined ? null : config.__source;
+        // Remaining properties are added to a new props object
+        for (propName in config) {
+          if (
+            hasOwnProperty.call(config, propName) &&
+            !RESERVED_PROPS.hasOwnProperty(propName)
+          ) {
+            props[propName] = config[propName];
+          }
+        }
+      }
+
+      // Children can be more than one argument, and those are transferred onto
+      // the newly allocated props object.
+      const childrenLength = arguments.length - 2;
+      if (childrenLength === 1) {
+        props.children = children;
+      } else if (childrenLength > 1) {
+        const childArray = Array(childrenLength);
+        for (let i = 0; i < childrenLength; i++) {
+          childArray[i] = arguments[i + 2];
+        }
+        if (__DEV__) {
+          if (Object.freeze) {
+            Object.freeze(childArray);
+          }
+        }
+        props.children = childArray;
+      }
+
+      // Resolve default props
+      if (type && type.defaultProps) {
+        const defaultProps = type.defaultProps;
+        for (propName in defaultProps) {
+          if (props[propName] === undefined) {
+            props[propName] = defaultProps[propName];
+          }
+        }
+      }
+      if (__DEV__) {
+        if (key || ref) {
+          if (
+            typeof props.$$typeof === 'undefined' ||
+            props.$$typeof !== REACT_ELEMENT_TYPE
+          ) {
+            const displayName =
+              typeof type === 'function'
+                ? type.displayName || type.name || 'Unknown'
+                : type;
+            if (key) {
+              defineKeyPropWarningGetter(props, displayName);
+            }
+            if (ref) {
+              defineRefPropWarningGetter(props, displayName);
+            }
+          }
+        }
+      }
+      return ReactElement(
+        type,
+        key,
+        ref,
+        self,
+        source,
+        ReactCurrentOwner.current,
+        props,
+      );
+    }
+
+这是ReactElement的实现代码，可以看到，createElement的函数签名有3个参数，分别是type,config,children，返回了一个用ReactELement构造函数初始化后的组件。
+
+| 参数 | 功能 |
+| :---: | :---: |
+| type | typebabel在解析jsx时会判断标签首字母大小写，大写为自定义组件，小写为原生HTML标签\(string/ReactClass\) |
+| config | refs,key等属性都在config中 |
+| children | 如果render的为单个组件，那么children参数为空，porps为空，如果为嵌套组件，内部组件作为children放入props中。 |
+
+而ReactELement的构造函数的$$typeof,key, props,ref,\_ower参数释义如下：
+
+| 参数 | 功能 |
+| :---: | :---: |
+| $$typeof | 组件的标识，通常为REACT\_ELEMENT\_TYPE |
+| key | DOM结构的标识id，在diff算法中有用。 |
+| props | 嵌套组件有用 |
+| ref | 对应真实DOM树的引用 |
+| \_ower | \_ower\_owner === ReactCurrentOwner.current\(ReactCurrentOwner.js\),值为创建当前组件的对象，默认值为null。\_owner === ReactCurrentOwner.current\(ReactCurrentOwner.js\),值为创建当前组件的对象，默认值为null。 |
+
+
+
+
+
+
+
 
 
