@@ -436,7 +436,7 @@ function createFiberRoot(containerInfo, hydrate) {
 }
 ```
 
-这是React 16的`FiberRoot`的结构，`createHostRootFiber`\(\)中是调用了`createFiber(HostRoot, null, NoContext); `这是返回了一个经过加工的fiber对象。这段代码很简单，如下：
+这是React 16的`FiberRoot`的结构，`createHostRootFiber`\(\)中是调用了`createFiber(HostRoot, null, NoContext);`这是返回了一个经过加工的fiber对象。这段代码很简单，如下：
 
 ```
 var createFiber = function (tag, key, internalContextTag) {
@@ -492,6 +492,10 @@ function FiberNode(tag, key, internalContextTag) {
   }
 }
 ```
+
+    可以看到，，一个Fiber就是一个POJO对象，代表了组件上需要做的工作。一个React Element可以对应一个或多个Fiber节点。在render函数中创建的React Element树在第一次渲染的时候会创建一颗结构一模一样的Fiber节点树。不同的React Element类型对应不同的Fiber节点类型。一个React Element的工作就由它对应的Fiber节点来负责。我们如果在console中打印React 16的组件实例，会发现有一个`_reactInternalFiber`属性指向它对应的Fiber实例。虽然React的代码中其实没有明确的Virtul DOM概念，但Fiber和我们概念中的Virtul DOM树是等价的。
+
+       Fiber带来了一个给React的渲染带来了重要的变化。React内部有事务的概念。之前React渲染相关的事务是连续的，一旦开始就会run to completion。现在React的事务则是由一系列Fiber的更新组成的，因此React可以在多个帧中断断续续的更新Fiber，最后commit变化。那为什么说一个React Element可以对应不止一个Fiber呢？因为Fiber在update的时候，会从原来的Fiber（我们称为current）clone出一个新的Fiber（我们称为alternate）。两个Fiber diff出的变化（side effect）记录在alternate上。所以一个组件在更新时最多会有两个Fiber与其对应，在更新结束后alternate会取代之前的current的成为新的current节点。
 
 
 
