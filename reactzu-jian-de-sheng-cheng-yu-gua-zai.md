@@ -345,7 +345,7 @@ var ReactDOM = {
  }
 ```
 
-可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),下面是这个方法的源码
+可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，下面是这个方法的源码
 
 ```
 function renderSubtreeIntoContainer(parentComponent, children, container, forceHydrate, callback) {
@@ -436,5 +436,62 @@ function createFiberRoot(containerInfo, hydrate) {
 }
 ```
 
-这是React 16的FiberRoot的结构，createHostRootFiber\(\)
+这是React 16的`FiberRoot`的结构，`createHostRootFiber`\(\)中是调用了`createFiber(HostRoot, null, NoContext); `这是返回了一个经过加工的fiber对象。这段代码很简单，如下：
+
+```
+var createFiber = function (tag, key, internalContextTag) {
+  // $FlowFixMe: the shapes are exact here but Flow doesn't like constructors
+  return new FiberNode(tag, key, internalContextTag);
+};
+```
+
+它这段代码又调用了FiberNode的构造方法，那我现在就看一下React 16的FiberNode的结构吧。
+
+```
+function FiberNode(tag, key, internalContextTag) {
+  // Instance
+  this.tag = tag;
+  this.key = key;
+  this.type = null;
+  this.stateNode = null;
+
+  // Fiber
+  this['return'] = null;
+  this.child = null;
+  this.sibling = null;
+  this.index = 0;
+
+  this.ref = null;
+
+  this.pendingProps = null;
+  this.memoizedProps = null;
+  this.updateQueue = null;
+  this.memoizedState = null;
+
+  this.internalContextTag = internalContextTag;
+
+  // Effects
+  this.effectTag = NoEffect;
+  this.nextEffect = null;
+
+  this.firstEffect = null;
+  this.lastEffect = null;
+
+  this.expirationTime = NoWork;
+
+  this.alternate = null;
+
+  {
+    this._debugID = debugCounter++;
+    this._debugSource = null;
+    this._debugOwner = null;
+    this._debugIsCurrentlyTiming = false;
+    if (!hasBadMapPolyfill && typeof Object.preventExtensions === 'function') {
+      Object.preventExtensions(this);
+    }
+  }
+}
+```
+
+
 
