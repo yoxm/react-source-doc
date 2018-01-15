@@ -345,7 +345,7 @@ var ReactDOM = {
  }
 ```
 
-可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，下面是这个方法的源码
+可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，这个方法做了这些事，首先传入父组件，如无则为null，子组件，通常传入的为当前需渲染的组件，下面是这个方法的源码
 
 ```
 function renderSubtreeIntoContainer(parentComponent, children, container, forceHydrate, callback) {
@@ -493,9 +493,26 @@ function FiberNode(tag, key, internalContextTag) {
 }
 ```
 
-    可以看到，，一个Fiber就是一个POJO对象，代表了组件上需要做的工作。一个React Element可以对应一个或多个Fiber节点。在render函数中创建的React Element树在第一次渲染的时候会创建一颗结构一模一样的Fiber节点树。不同的React Element类型对应不同的Fiber节点类型。一个React Element的工作就由它对应的Fiber节点来负责。我们如果在console中打印React 16的组件实例，会发现有一个`_reactInternalFiber`属性指向它对应的Fiber实例。虽然React的代码中其实没有明确的Virtul DOM概念，但Fiber和我们概念中的Virtul DOM树是等价的。
+React源码中的注释说：
 
-       Fiber带来了一个给React的渲染带来了重要的变化。React内部有事务的概念。之前React渲染相关的事务是连续的，一旦开始就会run to completion。现在React的事务则是由一系列Fiber的更新组成的，因此React可以在多个帧中断断续续的更新Fiber，最后commit变化。那为什么说一个React Element可以对应不止一个Fiber呢？因为Fiber在update的时候，会从原来的Fiber（我们称为current）clone出一个新的Fiber（我们称为alternate）。两个Fiber diff出的变化（side effect）记录在alternate上。所以一个组件在更新时最多会有两个Fiber与其对应，在更新结束后alternate会取代之前的current的成为新的current节点。
+> A Fiber is work on a Component that needs to be done or was done. There can be more than one per component.
 
+可以看到，，一个Fiber就是一个POJO对象，代表了组件上需要做的工作。一个React Element可以对应一个或多个Fiber节点。在render函数中创建的React Element树在第一次渲染的时候会创建一颗结构一模一样的Fiber节点树。不同的React Element类型对应不同的Fiber节点类型。一个React Element的工作就由它对应的Fiber节点来负责。我们如果在console中打印React 16的组件实例，会发现有一个`_reactInternalFiber`属性指向它对应的Fiber实例。虽然React的代码中其实没有明确的Virtul DOM概念，但Fiber和我们概念中的Virtul DOM树是等价的
 
+Fiber带来了一个给React的渲染带来了重要的变化。React内部有事务的概念。之前React渲染相关的事务是连续的，一旦开始就会run to completion。现在React的事务则是由一系列Fiber的更新组成的，因此React可以在多个帧中断断续续的更新Fiber，最后commit变化。那为什么说一个React Element可以对应不止一个Fiber呢？因为Fiber在update的时候，会从原来的Fiber（我们称为current）clone出一个新的Fiber（我们称为alternate）。两个Fiber diff出的变化（side effect）记录在alternate上。所以一个组件在更新时最多会有两个Fiber与其对应，在更新结束后alternate会取代之前的current的成为新的current节点。
+
+| 参数 | 功能 |
+| :--- | :--- |
+| tag | TypeOfWork, // fiber的类型，下一节会介绍TypeOfWork, // fiber的类型，下一节会介绍 |
+| alternate | Fiber \|\| null clone的镜像fiber，记录对fiber的修改 |
+| return | Fiber \|\| null 指向fiber树的根节点 |
+| child | Fiber \|\| null 指向第一个子节点 |
+| sibling | 指向兄弟节点 |
+| effectTag | TypeOfSideEffect |
+| nextEffect | Fiber \|\| null 单链表结构，方便遍历 |
+|  |  |
+
+在实际的渲染过程中，Fiber节点构成了一颗树。这棵树在数据结构上是通过单链表的形式构成的，Fiber节点上的`chlid`和`sibling`
+
+属性分别指向了这个节点的第一个子节点和相邻的兄弟节点。这样就可以遍历整个Fiber树了。![](/assets/Fiber图解.png)
 
