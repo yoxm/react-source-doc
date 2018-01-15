@@ -347,9 +347,17 @@ var ReactDOM = {
 
 可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，这个方法做了这些事，首先传入父组件，如无则为null，子组件，通常传入的为当前需渲染的组件，还有container，为挂载的节点，和是否强制hydrate以及回调，之后创建一个新的root节点，再调用DOMRenderer的单个更新，传入updateContainer\(\)更新。而updateContainer传入当前DOM中传入的组件，`Container`，父组件和回调，最后利用这些参数调用`scheduleTopLevelUpdate`
 
-之后在`scheduleTopLevelUpdate`中调用`insertUpdateIntoFiber`
+之后在`scheduleTopLevelUpdate`中调用`insertUpdateIntoFiber,`将这个更新插入到fiber的更新队列queue里面，之后进入scheduleWork方法，传入当前节点下面节点和暴露日期，来完成，下面是整个函数的调用栈。
 
-下面是这个方法的源码
+\|--renderSubTreeIntoContainer
+
+\|----unbatchedUpdates
+
+\|------scheduleTopLevelUpdate
+
+\|--------insertUpdateIntoFiber
+
+\|----------scheduleWork
 
 ```
 function renderSubtreeIntoContainer(parentComponent, children, container, forceHydrate, callback) {
@@ -408,7 +416,7 @@ function renderSubtreeIntoContainer(parentComponent, children, container, forceH
 }
 ```
 
-这其中传入的参数`hydrate`** **描述的是 ReactDOM 复用 ReactDOMServer 服务端渲染的内容时尽可能保留结构，并补充事件绑定等 Client 特有内容的过程。container是挂载的节点如div\#root，其中，经过一系列的判断，我们的newRoot节点是调用此文件下的createContainer\(container, shouldHydrate\),此文件代码如下
+这其中传入的参数`hydrate`** **描述的是 ReactDOM 复用 `ReactDOMServer` 服务端渲染的内容时尽可能保留结构，并补充事件绑定等 Client 特有内容的过程。container是挂载的节点如div\#root，其中，经过一系列的判断，我们的newRoot节点是调用此文件下的createContainer\(container, shouldHydrate\),此文件代码如下
 
 ```
 createContainer: function (containerInfo, hydrate) {
@@ -519,4 +527,6 @@ Fiber带来了一个给React的渲染带来了重要的变化。React内部有�
 在实际的渲染过程中，Fiber节点构成了一颗树。这棵树在数据结构上是通过单链表的形式构成的，Fiber节点上的`chlid`和`sibling`
 
 属性分别指向了这个节点的第一个子节点和相邻的兄弟节点。这样就可以遍历整个Fiber树了。![](/assets/Fiber图解.png)
+
+
 
