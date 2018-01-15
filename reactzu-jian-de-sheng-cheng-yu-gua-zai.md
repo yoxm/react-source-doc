@@ -345,7 +345,7 @@ var ReactDOM = {
  }
 ```
 
-可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，这个方法做了这些事，首先传入父组件，如无则为null，子组件，通常传入的为当前需渲染的组件，下面是这个方法的源码
+可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，这个方法做了这些事，首先传入父组件，如无则为null，子组件，通常传入的为当前需渲染的组件，还有container，为挂载的节点，和是否强制hydrate以及回调，之后创建一个新的root节点，再调用DOMRenderer的单个更新，传入updateContainer\(\)更新。而updateContainer传入当前DOM中传入的组件，Container，父组件和回调，下面是这个方法的源码
 
 ```
 function renderSubtreeIntoContainer(parentComponent, children, container, forceHydrate, callback) {
