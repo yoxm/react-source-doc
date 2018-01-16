@@ -318,6 +318,8 @@ exports.default = App;
 
 ```
 ReactDOM.render(<App />, document.getElementById('root'));
+
+ReactDOM.render(<button />, document.getElementById('root'));
 ```
 
 但是其中是怎么挂载到实际DOM树上的呢？我们可以打开node\_modules/react-dom/umd/react-dom.development.js看一下
@@ -345,7 +347,7 @@ var ReactDOM = {
  }
 ```
 
-可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，这个方法做了这些事，首先传入父组件，如无则为null，子组件，通常传入的为当前需渲染的组件，还有container，为挂载的节点，和是否强制hydrate以及回调，之后创建一个新的root节点，再调用DOMRenderer的单个更新，传入updateContainer\(\)更新。而updateContainer传入当前DOM中传入的组件，`Container`，父组件和回调，最后利用这些参数调用`scheduleTopLevelUpdate`
+可以发现，`ReactDOM`对外暴露的render方法为调用了`renderSubtreeIntoContainer`\(\),其实主要就是这么方法来挂载了DOM，这个方法做了这些事，首先传入父组件，如无则为null。子组件，通常传入的为当前需渲染的组件，还有container，为挂载的节点，和是否强制hydrate以及回调，之后创建一个新的root节点，再调用DOMRenderer的单个更新，传入updateContainer\(\)更新。而updateContainer传入当前DOM中传入的组件，`Container`，父组件和回调，最后利用这些参数调用`scheduleTopLevelUpdate`
 
 之后在`scheduleTopLevelUpdate`中调用`insertUpdateIntoFiber,`将这个更新插入到fiber的更新队列queue里面，之后进入scheduleWork方法，传入当前节点下面节点和暴露日期，来完成，下面是整个函数的调用栈。
 
@@ -522,11 +524,84 @@ Fiber带来了一个给React的渲染带来了重要的变化。React内部有�
 | sibling | 指向兄弟节点 |
 | effectTag | TypeOfSideEffect |
 | nextEffect | Fiber \|\| null 单链表结构，方便遍历 |
-|  |  |
+| pendingWorkPriority | 优先层级，标记子树上更新任务的优先级 ， |
 
 在实际的渲染过程中，Fiber节点构成了一颗树。这棵树在数据结构上是通过单链表的形式构成的，Fiber节点上的`chlid`和`sibling`
 
 属性分别指向了这个节点的第一个子节点和相邻的兄弟节点。这样就可以遍历整个Fiber树了。![](/assets/Fiber图解.png)
 
-经历过这个小插曲后，我们来进入
+现在解释一下上表的一些概念
+
+#### TypeOfWork {#TypeOfWork}
+
+这是源码中的typeOfWork，代表React中不同类型的fiber节点。
+
+```
+{
+  IndeterminateComponent: 0, // Before we know whether it is functional or class
+  FunctionalComponent: 1,
+  ClassComponent: 2,
+  HostRoot: 3, // Root of a host tree. Could be nested inside another node.
+  HostPortal: 4, // A subtree. Could be an entry point to a different renderer.
+  HostComponent: 5,
+  HostText: 6,
+  CoroutineComponent: 7,
+  CoroutineHandlerPhase: 8,
+  YieldComponent: 9,
+  Fragment: 10,
+}s
+
+```
+
+对几个常用的类型作一下解释：
+
+**ClassComponent**
+
+就是应用层面的React组件。ClassComponent是一个继承自React.Component的类的实例。
+
+**HostRoot**
+
+ReactDOM.render\(\)时的根节点。
+
+**HostComponent**
+
+React中最常见的抽象节点，是ClassComponent的组成部分。具体的实现取决于React运行的平台。在浏览器环境下就代表DOM节点，可以理解为所谓的虚拟DOM节点。HostComponent中的Host就代码这种组件的具体操作逻辑是由Host环境注入的。
+
+#### TypeOfSideEffect {#TypeOfSideEffect}
+
+> 说一下这是以二进制位表示的。可以多个叠加。
+
+```
+{
+  NoEffect: 0,          
+  PerformedWork: 1,   
+  Placement: 2, // 插入         
+  Update: 4, // 更新           
+  PlacementAndUpdate: 6, 
+  Deletion: 8, // 删除   
+  ContentReset: 16,  
+  Callback: 32,      
+  Err: 64,         
+  Ref: 128,          
+};
+
+```
+
+#### Priority {#Priority}
+
+Priority指的是Fiber中一个work的优先级。这是React源码中的对Priority类型的定义：
+
+```
+{
+  NoWork: 0, // No work is pending.
+  SynchronousPriority: 1, // For controlled text inputs. Synchronous side-effects.
+  TaskPriority: 2, // Completes at the end of the current tick.
+  HighPriority: 3, // Interaction that needs to complete pretty soon to feel responsive.
+  LowPriority: 4, // Data fetching, or result from updating stores.
+  OffscreenPriority: 5, // Won't be visible but do the work in case it becomes visible.
+}
+
+```
+
+我们可以把Priority分为同步和异步两个类别，同步优先级的任务会在当前帧完成，包括SynchronousPriority和TaskPriority。异步优先级的任务则可能在接下来的几个帧中被完成，包括HighPriority、LowPriority以及OffscreenPriority。
 
