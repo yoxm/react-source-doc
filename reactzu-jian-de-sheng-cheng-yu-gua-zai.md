@@ -494,16 +494,6 @@ function FiberNode(tag, key, internalContextTag) {
   this.expirationTime = NoWork;
 
   this.alternate = null;
-
-  {
-    this._debugID = debugCounter++;
-    this._debugSource = null;
-    this._debugOwner = null;
-    this._debugIsCurrentlyTiming = false;
-    if (!hasBadMapPolyfill && typeof Object.preventExtensions === 'function') {
-      Object.preventExtensions(this);
-    }
-  }
 }
 ```
 
@@ -526,7 +516,13 @@ Fiber带来了一个给React的渲染带来了重要的变化。React内部有�
 | nextEffect | Fiber \|\| null 单链表结构，方便遍历 |
 | pendingWorkPriority | 优先层级，标记子树上更新任务的优先级 ， |
 
-在实际的渲染过程中，Fiber节点构成了一颗树。这棵树在数据结构上是通过单链表的形式构成的，Fiber节点上的`chlid`和`sibling`
+ALTERNATE FIBER
+可以理解为一个fiber版本池，用于交替记录组件更新（切分任务后变成多阶段更新）过程中fiber的更新，因为在组件更新的各阶段，更新前及更新过程中fiber状态并不一致，在需要恢复时（如，发生冲突），即可使用另一者直接回退至上一版本fiber。
+
+使用alternate属性双向连接一个当前fiber和其work-in-progress，当前fiber实例的alternate属性指向其work-in-progress，work-in-progress的alternate属性指向当前稳定fiber；
+当前fiber的替换版本是其work-in-progress，work-in-progress的交替版本是当前fiber；
+当work-in-progress更新一次后，将同步至当前fiber，然后继续处理，同步直至任务完成；
+work-in-progress指向处理过程中的fiber，而当前fiber总是维护处理完成的最新版本的fiber。在实际的渲染过程中，Fiber节点构成了一颗树。这棵树在数据结构上是通过单链表的形式构成的，Fiber节点上的`chlid`和`sibling`
 
 属性分别指向了这个节点的第一个子节点和相邻的兄弟节点。这样就可以遍历整个Fiber树了。![](/assets/Fiber图解.png)
 
@@ -537,21 +533,23 @@ Fiber带来了一个给React的渲染带来了重要的变化。React内部有�
 这是源码中的typeOfWork，代表React中不同类型的fiber节点。
 
 ```javascript
-{
-  IndeterminateComponent: 0, // Before we know whether it is functional or class
-  FunctionalComponent: 1,
-  ClassComponent: 2,
-  HostRoot: 3, // Root of a host tree. Could be nested inside another node.
-  HostPortal: 4, // A subtree. Could be an entry point to a different renderer.
-  HostComponent: 5,
-  HostText: 6,
-  CoroutineComponent: 7,
-  CoroutineHandlerPhase: 8,
-  YieldComponent: 9,
-  Fragment: 10,
-}s
+export type TypeOfWork = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
+export const IndeterminateComponent = 0; // 尚不知是类组件还是函数式组件
+export const FunctionalComponent = 1; // 函数式组件
+export const ClassComponent = 2; // Class类组件
+export const HostRoot = 3; // 组件树根组件，可以嵌套
+export const HostPortal = 4; // 子树. Could be an entry point to a different renderer.
+export const HostComponent = 5; // 标准组件，如地div， span等
+export const HostText = 6; // 文本
+export const CallComponent = 7; // 组件调用
+export const CallHandlerPhase = 8; // 调用组件方法
+export const ReturnComponent = 9; // placeholder（占位符）
+export const Fragment = 10; // 片段
 
 ```
+
+
 
 对几个常用的类型作一下解释：
 
