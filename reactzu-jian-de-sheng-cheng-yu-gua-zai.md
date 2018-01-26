@@ -1,10 +1,10 @@
-## React组件的构成
+# React组件的构成
 
-### 一、React组件是什么样的
+## 一、React组件是什么样的
 
 先看下面的这段代码
 
-```
+```javascript
 import React, { Component} from 'react';
 
 class App extends Component {
@@ -35,7 +35,7 @@ console.log\(\);打印一下看看！
 
 在node\_module/react/umd/react.development.js中相关代码如下
 
-```
+```javascript
 var React = {
   Children: {
     map: mapChildren,
@@ -68,7 +68,7 @@ var React = {
 
 发现React对外暴露的React对象拥有Children， Component， PureComponent， unstable\_AsyncComponent，Fragment，createElement，cloneElement，createFactory，isValidElement及\_\_SECRET\_INTERNALS\_DO\_NOT\_USE\_OR\_YOU\_WILL\_BE\_FIRED这几个方法，其中的Component就是我们最常使用的方法，PureComponent是傀儡（受控\)组件的实现，顺着上面import的ReactBaseClasses来看看这个文件里有什么。
 
-```
+```javascript
 Component.prototype.setState = function(partialState, callback) {
   invariant(
     typeof partialState === 'object' ||
@@ -134,7 +134,7 @@ export {Component, PureComponent, AsyncComponent};
 
 我们可以吧&lt;App /&gt;组件的代码放到Babel中看一下。
 
-```
+```javascript
 var App = function (_Component) {
   _inherits(App, _Component);
 
@@ -163,7 +163,7 @@ exports.default = App;
 
 其中的inherits是es6 extends的实现，表示继承，我们可以关注下createClass 和 createElement,我们可以打开与React.js同级目录下看一下。
 
-```
+```javascript
     function createElement(type, config, children) {
         var propName;
 
@@ -316,7 +316,7 @@ exports.default = App;
 
 我们知道可以通过`ReactDOM.render(component,mountNode)`的形式对自定义组件/原生DOM/字符串进行挂载，例如
 
-```
+```javascript
 ReactDOM.render(<App />, document.getElementById('root'));
 
 ReactDOM.render(<button />, document.getElementById('root'));
@@ -326,7 +326,7 @@ ReactDOM.render(<button />, document.getElementById('root'));
 
 下面是相关代码:
 
-```
+```javascript
 /* 省略大量代码 */
 var ReactDOM = {
   createPortal: createPortal,
@@ -361,7 +361,7 @@ var ReactDOM = {
 
 \|----------scheduleWork
 
-```
+```javascript
 function renderSubtreeIntoContainer(parentComponent, children, container, forceHydrate, callback) {
   !isValidContainer(container) ? invariant_1(false, 'Target container is not a DOM element.') : void 0;
 
@@ -420,7 +420,7 @@ function renderSubtreeIntoContainer(parentComponent, children, container, forceH
 
 这其中传入的参数`hydrate`** **描述的是 ReactDOM 复用 `ReactDOMServer` 服务端渲染的内容时尽可能保留结构，并补充事件绑定等 Client 特有内容的过程。container是挂载的节点如div\#root，其中，经过一系列的判断，我们的newRoot节点是调用此文件下的createContainer\(container, shouldHydrate\),此文件代码如下
 
-```
+```javascript
 createContainer: function (containerInfo, hydrate) {
   return createFiberRoot(containerInfo, hydrate);
 },
@@ -428,7 +428,7 @@ createContainer: function (containerInfo, hydrate) {
 
 可以看到进入了react的fiberRoot方法中，createFiberRoot代码如下：
 
-```
+```javascript
 function createFiberRoot(containerInfo, hydrate) {
   // Cyclic construction. This cheats the type system right now because
   // stateNode is any.
@@ -452,7 +452,7 @@ function createFiberRoot(containerInfo, hydrate) {
 
 这是React 16的`FiberRoot`的结构，`createHostRootFiber`\(\)中是调用了`createFiber(HostRoot, null, NoContext);`这是返回了一个经过加工的fiber对象。这段代码很简单，如下：
 
-```
+```javascript
 var createFiber = function (tag, key, internalContextTag) {
   // $FlowFixMe: the shapes are exact here but Flow doesn't like constructors
   return new FiberNode(tag, key, internalContextTag);
@@ -461,7 +461,7 @@ var createFiber = function (tag, key, internalContextTag) {
 
 它这段代码又调用了FiberNode的构造方法，那我现在就看一下React 16的FiberNode的结构吧。
 
-```
+```javascript
 function FiberNode(tag, key, internalContextTag) {
   // Instance
   this.tag = tag;
@@ -536,7 +536,7 @@ Fiber带来了一个给React的渲染带来了重要的变化。React内部有�
 
 这是源码中的typeOfWork，代表React中不同类型的fiber节点。
 
-```
+```javascript
 {
   IndeterminateComponent: 0, // Before we know whether it is functional or class
   FunctionalComponent: 1,
@@ -571,7 +571,7 @@ React中最常见的抽象节点，是ClassComponent的组成部分。具体的�
 
 > 说一下这是以二进制位表示的。可以多个叠加。
 
-```
+```javascript
 {
   NoEffect: 0,          
   PerformedWork: 1,   
@@ -591,7 +591,7 @@ React中最常见的抽象节点，是ClassComponent的组成部分。具体的�
 
 Priority指的是Fiber中一个work的优先级。这是React源码中的对Priority类型的定义：
 
-```
+```javascript
 {
   NoWork: 0, // No work is pending.
   SynchronousPriority: 1, // For controlled text inputs. Synchronous side-effects.
