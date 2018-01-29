@@ -38,7 +38,7 @@ class App extends Component {
 export default App;
 ```
 
-我们通过点击按钮，设置原本的 state，将 text 123 变为 456，我们观察以下具体的函数调用栈。通过在 chrome 中的断点调试，我们发现 setState 的函数如下所示。
+我们通过触发点击事件，设置原本的 state，将 text 123 变为 456，我们观察以下具体的函数调用栈。通过在 chrome 中的断点调试，我们发现 setState 的函数如下所示。
 
 ```javascript
 Component.prototype.setState = function(partialState, callback) {
@@ -70,81 +70,9 @@ enqueueSetState: function (instance, partialState, callback) {
     },
 ```
 
-首先，我们通过我们传入的 this, 获取到了这个实例对应的 fiber 对象。之后计算出 fiber 对象的优先级，创建此次更新的 update 对象，，利用`insertUpdateIntoFiber`将此次更新插入到对应的 fiber 对象中，之后利用`scheduleWork`进行一次任务调度，整个 setState 就到此为止了。但是这个 react15 又有何不同呢？我们可以从 expirationTime 来看看。
+首先，我们通过我们传入的 this, 获取到了这个实例对应的 fiber 对象。之后计算出 fiber 对象的优先级，创建此次更新的 update 对象，，利用`insertUpdateIntoFiber`将此次更新插入到对应的 fiber 对象中，之后利用`scheduleWork`进行一次任务调度，整个 setState 就到此为止了。但是这个与 react15 又有何不同呢？我们可以从 expirationTime 来看看。
 
-expirationTime, 顾名思义，就是失效时间，在 React 里表示更新任务的最晚执行时间，所谓的到期时间（ExpirationTime），是相对于调度器初始调用的起始时间而言的一个时间段；调度器初始调用后的某一段时间内，需要调度完成这项更新，这个时间段长度值就是到期时间值。在 React 15 的调度过程中，是使用 priorityLevel 这个优先级来区分。在 16.x 版本中使用的则是 ExpirationTime 的到期时间方式表示任务的优先级，可以更好的对任务进行切分，调度。
 
-```javascript
-export const NoWork = 0; // 没有任务等待处理
-export const Sync = 1; // 同步模式，立即处理任务
-export const Never = 2147483647; // Max int32: Math.pow(2, 31) - 1
-const UNIT_SIZE = 10; // 过期时间单元（ms）
-const MAGIC_NUMBER_OFFSET = 2; // 到期时间偏移量
-
-// 以ExpirationTime特定单位（1单位=10ms）表示的到期执行时间
-// 1 unit of expiration time represents 10ms.
-export function msToExpirationTime(ms) {
-  // 总是增加一个偏移量，在ms<10时与Nowork模式进行区别
-  return ((ms / UNIT_SIZE) | 0) + MAGIC_NUMBER_OFFSET;
-}
-// 以毫秒表示的到期执行时间
-export function expirationTimeToMs(expirationTime: ExpirationTime) {
-  return (expirationTime - MAGIC_NUMBER_OFFSET) * UNIT_SIZE;
-}
-// 向上取整（整数单位到期执行时间）
-// precision范围精度：弥补任务执行时间误差
-function ceiling(num, precision) {
-  return (((num / precision) | 0) + 1) * precision;
-}
-
-// 计算处理误差时间在内的到期时间
-export function computeExpirationBucket(
-  currentTime,
-  expirationInMs,
-  bucketSizeMs
-) {
-  return ceiling(
-    currentTime + expirationInMs / UNIT_SIZE,
-    bucketSizeMs / UNIT_SIZE
-  );
-}
-```
-
-上面代码提供的功能有：Sync：同步模式，在 UI 线程立即执行此类任务，如动画反馈等；异步模式：转换：到期时间特定单位和时间单位（ms）的相互转换；计算：计算包含允许误差在内的到期时间；在 computeExpirationForFiber 函数中，
-
-```javascript
-function computeExpirationForFiber(fiber) {
-  var expirationTime = void 0;
-  if (expirationContext !== NoWork) {
-    // 明确的到期上下文被设置;
-    expirationTime = expirationContext;
-  } else if (isWorking) {
-    if (isCommitting) {
-      //在提交阶段发生的更新应该具有同步优先级。
-      expirationTime = Sync;
-    } else {
-      // 呈现阶段中的更新应该与正在呈现的工作同时过期。
-      expirationTime = nextRenderExpirationTime;
-    }
-  } else {
-    // 没有明确的过期上下文，我们目前没有执行工作。 计算新的到期时间。
-    if (useSyncScheduling && !(fiber.internalContextTag & AsyncUpdates)) {
-      // 同步
-      expirationTime = Sync;
-    } else {
-      // T异步
-      expirationTime = computeAsyncExpiration();
-    }
-  }
-  return expirationTime;
-}
-```
-
-1. 若当前处于任务提交阶段（更新提交至 DOM 渲染）时，设置当前 fiber 到期时间为 Sync，即同步执行模式
-2. 若处于 DOM 渲染阶段时，则需要延迟此 fiber 任务，将 fiber 到期时间设置为下一次 DOM 渲染到期时间；
-3. 若不在任务执行阶段，则需重新设置 fiber 到期时间
-4. 若明确设置 useSyncScheduling 且 fiber.internalContextTag 值不等于 AsyncUpdates，则表明是同步模式，设置为 Sync
-5. 否则，调用 computeAsyncExpiration 方法重新计算此 fiber 的到期时间，
 
 通过这样的计算，我们得出此次任务的最晚到期时间，接下来构造了一个 update 的对象，然后调用 insertUpdateIntoFiber 方法，将此次更新插入 update 队列
 
